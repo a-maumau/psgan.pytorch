@@ -1,0 +1,3 @@
+[submodule "train_logger"]
+	path = train_logger
+	url = https://github.com/a-maumau/train_logger.git
