@@ -72,13 +72,13 @@ def train(args):
     if args.sgd:
         generator_optimizer = torch.optim.SGD(generator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
         discriminator_optimizer = torch.optim.SGD(discriminator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
-
     else:
         generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.learning_rate_d, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
         discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.learning_rate_d, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
     
-
+    # for cropping size
     img_size = args.spatial_size*(2**args.layer_num)
+
     train_loader = get_loader(data_set=dataset_setting.get_dtd_train_loader(args, img_size),
                               batch_size=args.batch_size,
                               shuffle=True,
@@ -106,6 +106,7 @@ def train(args):
     epochs = tqdm(range(args.epochs), ncols=100, desc="train")
 
     for epoch in epochs:
+        # for logging
         epoch_total_loss = 0.0
         epoch_total_dloss = 0.0
         epoch_total_gloss = 0.0
@@ -252,4 +253,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     train(args)
-  

@@ -274,6 +274,7 @@ class PSGANDiscriminator(nn.Module):
         batch_size = x.shape[0]
 
         x = self.discriminate(x)
+        
         spatial_size = x.shape[2]
         return x.view(batch_size, spatial_size*spatial_size)
 
@@ -291,4 +292,3 @@ class PSGANDiscriminator(nn.Module):
         except:
             torch.save(self.state_dict(), "./model_param.pth.tmp")
             print("save_error.\nsaved at ./model_param.pth.tmp only model params.")
-

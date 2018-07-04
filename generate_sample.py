@@ -65,7 +65,7 @@ def train(args):
         print(args)
 
     # for sampling
-    random_noise = to_var(generator.generate_noise(batch_size=8,
+    random_noise = to_var(generator.generate_noise(batch_size=args.sample_num,
                                                    local_dim=args.zl_dim,
                                                    global_dim=args.zg_dim,
                                                    periodic_dim=args.zp_dim,
@@ -81,6 +81,7 @@ def train(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
+    # setting
     parser.add_argument('--trained', type=str, default="trained_model", help='trained parameter path of generator.')
 
     # detail settings
@@ -98,7 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str, default="./log/sampled", help='directory of saving sampled image')
 
     parser.add_argument('--epochs', type=int, default=10000, help="train epoch num.")
-    parser.add_argument('--sample_size', type=int, default=25, help="sample size")
+    parser.add_argument('--sample_num', type=int, default=1, help="sample size")
     parser.add_argument('--num_workers', type=int, default=8, help="worker # of data loader")
 
     parser.add_argument('--gpu_device_num', type=int, default=0, help="device number of gpu")
@@ -110,4 +111,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     train(args)
-  
