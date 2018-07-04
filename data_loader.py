@@ -46,7 +46,7 @@ class DTDDataLoader(data.Dataset):
         tqdm.write("loading images...")
 
         # read the 
-        for tex_id, tex_name in enumerate(tqdm(self.texture_names, desc="textures", ncols=80)):
+        for tex_name in tqdm(self.texture_names, desc="textures", ncols=80):
             texture_file_path = os.path.join(data_root, tex_name)
             try:
                 images = os.listdir(texture_file_path)

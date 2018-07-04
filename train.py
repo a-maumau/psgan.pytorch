@@ -19,8 +19,6 @@ from data_loader import get_loader
 from train_logger import TrainLogger
 
 torch.backends.cudnn.benchmark = True
-UNIFOMR_RANGE_MIN = -1.0
-UNIFOMR_RANGE_MAX = 1.0
 
 def save_image(imgs, output_dir="log", img_name="output", img_ext=".png"):
     vutils.save_image(imgs.data, "{}".format(os.path.join(output_dir, img_name+img_ext)))
@@ -53,7 +51,7 @@ def train(args):
                               periodic_noise_dim=args.zp_dim,
                               spatial_size=args.spatial_size,
                               hidden_noise_dim=args.mlp_hidden_dim).cuda(args.gpu_device_num)
-        discriminator = Discriminator(conv_channels=dis_layers, kernel_size=args.kernel_size, gen_spatial_size=args.spatial_size).cuda(args.gpu_device_num)
+        discriminator = Discriminator(conv_channels=dis_layers, kernel_size=args.kernel_size).cuda(args.gpu_device_num)
     else:
         generator = Generator(conv_channels=gen_layers,
                               kernel_size=args.kernel_size,
@@ -62,7 +60,7 @@ def train(args):
                               periodic_noise_dim=args.zp_dim,
                               spatial_size=args.spatial_size,
                               hidden_noise_dim=args.mlp_hidden_dim)
-        discriminator = Discriminator(conv_channels=dis_layers, kernel_size=args.kernel_size, gen_spatial_size=args.spatial_size)
+        discriminator = Discriminator(conv_channels=dis_layers, kernel_size=args.kernel_size)
 
     if args.show_parameters:
         for idx, m in enumerate(model.modules()):
@@ -71,13 +69,13 @@ def train(args):
         print(args)
 
     # training setting
-    if args.adam:
-        generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.learning_rate, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
-        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.learning_rate, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
+    if args.sgd:
+        generator_optimizer = torch.optim.SGD(generator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
+        discriminator_optimizer = torch.optim.SGD(discriminator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
 
     else:
-        generator_optimizer = torch.optim.SGD(generator.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=1e-8)
-        discriminator_optimizer = torch.optim.SGD(discriminator.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=1e-8)
+        generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.learning_rate_d, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
+        discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.learning_rate_d, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
     
 
     img_size = args.spatial_size*(2**args.layer_num)
@@ -97,7 +95,7 @@ def train(args):
 
     # for fixed sampling
     
-    fixed_noise = to_var(generator.generate_noise(batch_size=1,
+    fixed_noise = to_var(generator.generate_noise(batch_size=8,
                                                   local_dim=args.zl_dim,
                                                   global_dim=args.zg_dim,
                                                   periodic_dim=args.zp_dim,
@@ -112,7 +110,7 @@ def train(args):
         epoch_total_dloss = 0.0
         epoch_total_gloss = 0.0
 
-        if (epoch+1) % args.decay_every == 0 and not args.adam:
+        if (epoch+1) % args.decay_every == 0 and args.sgd:
             for param_group in generator_optimizer.param_groups:
                 param_group['lr'] *= args.decay_value
 
@@ -183,8 +181,8 @@ def train(args):
             save_image(fake_img.mul(0.5).add(0.5).cpu(), output_dir=args.save_dir, img_name="sample_e{}".format(epoch+1))
             generator.train()
 
-        tqdm.write("[#{}]train epoch loss: {:.5f}, dloss: {:.5f}, gloss: {:.5f}"
-            .format(epoch+1, epoch_total_loss, epoch_total_dloss, epoch_total_gloss))
+        tqdm.write("[#{}]train epoch dloss: {:.5f}, gloss: {:.5f}"
+            .format(epoch+1, epoch_total_dloss, epoch_total_gloss))
 
         tlog.log([epoch+1, float(epoch_total_loss), float(epoch_total_dloss), float(epoch_total_gloss)])
 
@@ -215,12 +213,13 @@ if __name__ == '__main__':
     parser.add_argument('--image_list', type=str, default='train_names.txt', help='image list')
 
     # detail settings
-    parser.add_argument('--zl_dim', type=int, default=40, help='size of local part noise dimension')
-    parser.add_argument('--zg_dim', type=int, default=20, help='size of global part noise dimension')
-    parser.add_argument('--zp_dim', type=int, default=4, help='size of periodic part noise dimension')
+    parser.add_argument('--zl_dim', type=int, default=40, help='size of local part noise dimension')   # set default same as author's implementation
+    parser.add_argument('--zg_dim', type=int, default=20, help='size of global part noise dimension')  # set default same as author's implementation
+    parser.add_argument('--zp_dim', type=int, default=3, help='size of periodic part noise dimension') # set default same as author's implementation
     parser.add_argument('--mlp_hidden_dim', type=int, default=60, help='size of periodic part noise dimension')
     parser.add_argument('--spatial_size', type=int, default=5, help='size of spatial dimension')
-    parser.add_argument('--kernel_size', type=int, default=5, help='size of kernels')
+    # for pytorch there is no pad="same", if you need use 5 or other sizes, you might need add torch.nn.functional.pad in the model.
+    parser.add_argument('--kernel_size', type=int, default=4, help='size of kernels')
     parser.add_argument('--layer_num', type=int, default=5, help='number of layers')
     parser.add_argument('--base_conv_channel', type=int, default=64, help='base channel number of convolution layer')
     parser.add_argument('--tile', type=int, default=None, help='')
@@ -230,14 +229,15 @@ if __name__ == '__main__':
     #parser.add_argument('--resize_size', type=int, default=80, help='size for image after processing')
 
     parser.add_argument('--save_dir', type=str, default="./log/", help='dir of saving log and model parameters and so on')
-    parser.add_argument('--save_sample_every', type=int, default=500, help='count of saving model')
+    parser.add_argument('--save_sample_every', type=int, default=100, help='count of saving model')
     parser.add_argument('--save_model_every', type=int, default=500, help='count of saving model')
 
     parser.add_argument('--epochs', type=int, default=10000, help="train epoch num.")
     parser.add_argument('--batch_size', type=int, default=25, help="mini batch size")
     parser.add_argument('--num_workers', type=int, default=8, help="worker # of data loader")
 
-    parser.add_argument('--learning_rate', type=float, default=0.0002, help="initial value of learning rate")
+    parser.add_argument('--learning_rate_g', type=float, default=2e-4, help="initial value of learning rate")
+    parser.add_argument('--learning_rate_d', type=float, default=5e-5, help="initial value of learning rate")
     parser.add_argument('--adam_beta', type=float, default=0.5, help="initial value of learning rate")
     parser.add_argument('--decay_value', type=float, default=0.1, help="decay learning rate with count of args:decay_every in this factor.")
     parser.add_argument('--decay_every', type=int, default=2000, help="count of decaying learning rate")
@@ -246,7 +246,7 @@ if __name__ == '__main__':
         
     # option
     parser.add_argument('-nogpu', action="store_true", default=False, help="don't use gpu")
-    parser.add_argument('-adam', action="store_true", default=False, help="use adam optimizer")
+    parser.add_argument('-sgd', action="store_true", default=False, help="use sgd optimizer")
     parser.add_argument('-show_parameters', action="store_true", default=False, help='show model parameters')
     
     args = parser.parse_args()
