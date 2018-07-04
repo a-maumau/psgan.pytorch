@@ -7,9 +7,12 @@ import torch.nn.functional as F
 
 import numpy as np
 
+UNIFOMR_RANGE_MIN = -1.0
+UNIFOMR_RANGE_MAX = 1.0
+
 class PSGANGenerator(nn.Module):
     inplace_flag = False
-    def __init__(self, conv_channels=[64, 512, 256, 128, 64, 3], kernel_size=5, local_noise_dim=40, global_noise_dim=20, periodic_noise_dim=4, spatial_size=6, hidden_noise_dim=60):
+    def __init__(self, conv_channels=[64, 512, 256, 128, 64, 3], kernel_size=4, local_noise_dim=40, global_noise_dim=20, periodic_noise_dim=4, spatial_size=6, hidden_noise_dim=60):
         """
             args:
                 input_channel: int
@@ -39,7 +42,7 @@ class PSGANGenerator(nn.Module):
 
         layers = []
         
-        layers.append(nn.ConvTranspose2d(in_channels=conv_channels[0], out_channels=conv_channels[1], kernel_size=kernel_size, stride=1, padding=0))
+        layers.append(nn.ConvTranspose2d(in_channels=conv_channels[0], out_channels=conv_channels[1], kernel_size=kernel_size, stride=2, padding=1))
         layers.append(nn.BatchNorm2d(conv_channels[1]))
         layers.append(nn.ReLU(inplace=self.inplace_flag))
         
@@ -184,11 +187,11 @@ class PSGANGenerator(nn.Module):
         Z = np.zeros((batch_size, local_dim+global_dim, spatial_size, spatial_size))
 
         # set local noise
-        Z[:, :local_dim] = np.random.uniform(-1.,1., (batch_size, local_dim, spatial_size, spatial_size))
+        Z[:, :local_dim] = np.random.uniform(UNIFOMR_RANGE_MIN, UNIFOMR_RANGE_MAX, (batch_size, local_dim, spatial_size, spatial_size))
         
         # set global noise
         if tile is None:
-            Z_g = np.random.uniform(-1.,1., (batch_size, global_dim, 1, 1))
+            Z_g = np.random.uniform(UNIFOMR_RANGE_MIN, UNIFOMR_RANGE_MAX, (batch_size, global_dim, 1, 1))
 
             # use numpy's broadcast to fill all spatial dimension to be same (repeated)
             # global noise
@@ -200,7 +203,7 @@ class PSGANGenerator(nn.Module):
         else:
             for i in range(spatial_size//tile):
                 for j in range(spatial_size//tile):
-                    Z_g = np.random.uniform(-1.,1., (batch_size, global_dim, 1, 1))
+                    Z_g = np.random.uniform(UNIFOMR_RANGE_MIN, UNIFOMR_RANGE_MAX, (batch_size, global_dim, 1, 1))
 
                     # use numpy's broadcast to fill all spatial dimension to be same in the tile
                     Z[:, local_dim:local_dim+global_dim, i*tile:(i+1)*tile, j*tile:(j+1)*tile] = Z_g
@@ -226,12 +229,26 @@ class PSGANGenerator(nn.Module):
             torch.save(self.state_dict(), "./model_param.pth.tmp")
             print("save_error.\nsaved at ./model_param.pth.tmp only model params.")
 
+    def load_trained_param(self, parameter_path, print_debug=False):
+        chkp = torch.load(os.path.abspath(parameter_path), map_location=lambda storage, location: storage)
+
+        if print_debug:
+            print(chkp.keys())
+
+        self.load_state_dict(chkp["state_dict"])
+
 class PSGANDiscriminator(nn.Module):
     inplace_flag = False
-    def __init__(self, conv_channels=[3, 64, 128, 256, 512, 1], kernel_size=5, gen_spatial_size=6):
+    def __init__(self, conv_channels=[3, 64, 128, 256, 512, 1], kernel_size=4):
         super(PSGANDiscriminator, self).__init__()
+        """
+            args:
+                conv_channel: list of int
+                    the channel of convolution layer will be construct on this.
 
-        self.gen_spatial_size = gen_spatial_size
+                kernel_size; int 
+                    the size of kernel. 
+        """
 
         layers = []
         for ch_index in range(1, len(conv_channels)-1):
@@ -240,7 +257,7 @@ class PSGANDiscriminator(nn.Module):
                 layers.append(nn.BatchNorm2d(conv_channels[ch_index]))
             layers.append(nn.LeakyReLU(negative_slope=0.2, inplace=self.inplace_flag))
 
-        layers.append(nn.Conv2d(in_channels=conv_channels[-2], out_channels=conv_channels[-1], kernel_size=kernel_size, stride=2, padding=2))
+        layers.append(nn.Conv2d(in_channels=conv_channels[-2], out_channels=conv_channels[-1], kernel_size=kernel_size, stride=2, padding=1))
         layers.append(nn.Sigmoid())
 
         self.discriminate = nn.Sequential(*layers)
@@ -257,8 +274,8 @@ class PSGANDiscriminator(nn.Module):
         batch_size = x.shape[0]
 
         x = self.discriminate(x)
-
-        return x.view(batch_size, self.gen_spatial_size*self.gen_spatial_size)
+        spatial_size = x.shape[2]
+        return x.view(batch_size, spatial_size*spatial_size)
 
     def save(self, add_state={}, file_name="model_param.pth"):
         #assert type(add_state) is dict, "arg1:add_state must be dict"
