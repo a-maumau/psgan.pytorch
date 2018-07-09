@@ -109,7 +109,7 @@ class PSGANGenerator(nn.Module):
                 for m in range(self.spatial_size):
                     Z_p[:, :, l, m] = k1*l + k2*m
 
-            Z_p = Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi
+            Z_p = torch.sin(Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi)
 
         else:
             # naive...
@@ -129,7 +129,7 @@ class PSGANGenerator(nn.Module):
                             # no confidence at this part...
                             Z_p[:, :, l+i, m+j] = k1*l + k2*m
 
-                    Z_p = Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi
+                    Z_p = torch.sin(Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi)
 
         return Z_p
 
@@ -274,6 +274,7 @@ class PSGANDiscriminator(nn.Module):
         batch_size = x.shape[0]
 
         x = self.discriminate(x)
+
         spatial_size = x.shape[2]
         return x.view(batch_size, spatial_size*spatial_size)
 
@@ -291,4 +292,3 @@ class PSGANDiscriminator(nn.Module):
         except:
             torch.save(self.state_dict(), "./model_param.pth.tmp")
             print("save_error.\nsaved at ./model_param.pth.tmp only model params.")
-
