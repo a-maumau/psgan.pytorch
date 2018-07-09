@@ -274,7 +274,7 @@ class PSGANDiscriminator(nn.Module):
         batch_size = x.shape[0]
 
         x = self.discriminate(x)
-
+        
         spatial_size = x.shape[2]
         return x.view(batch_size, spatial_size*spatial_size)
 
