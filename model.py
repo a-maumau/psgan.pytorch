@@ -109,7 +109,7 @@ class PSGANGenerator(nn.Module):
                 for m in range(self.spatial_size):
                     Z_p[:, :, l, m] = k1*l + k2*m
 
-            Z_p = Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi
+            Z_p = torch.sin(Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi)
 
         else:
             # naive...
@@ -129,7 +129,7 @@ class PSGANGenerator(nn.Module):
                             # no confidence at this part...
                             Z_p[:, :, l+i, m+j] = k1*l + k2*m
 
-                    Z_p = Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi
+                    Z_p = torch.sin(Z_p + torch.rand(batch_size, self.periodic_noise_dim, 1, 1).type(Z.type())*2*math.pi)
 
         return Z_p
 
