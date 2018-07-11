@@ -230,7 +230,7 @@ if __name__ == '__main__':
     #parser.add_argument('--resize_size', type=int, default=80, help='size for image after processing')
 
     parser.add_argument('--save_dir', type=str, default="./log/", help='dir of saving log and model parameters and so on')
-    parser.add_argument('--save_sample_every', type=int, default=100, help='count of saving model')
+    parser.add_argument('--save_sample_every', type=int, default=500, help='count of saving model')
     parser.add_argument('--save_model_every', type=int, default=500, help='count of saving model')
 
     parser.add_argument('--epochs', type=int, default=10000, help="train epoch num.")
