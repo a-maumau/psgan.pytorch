@@ -71,12 +71,29 @@ def train(args):
                                                    periodic_dim=args.zp_dim,
                                                    spatial_size=args.spatial_size,
                                                    tile=args.tile),
-                        volatile=False)
+                    volatile=False)
+
+    random_noise_interpolation = to_var(generator.generate_noise_interpolation(batch_size=args.sample_num,
+                                                   local_dim=args.zl_dim,
+                                                   global_dim=args.zg_dim,
+                                                   periodic_dim=args.zp_dim,
+                                                   spatial_size=args.spatial_size),
+                                volatile=False)
+
+    random_noise_interpolation_left_right = to_var(generator.generate_noise_left2right_interpolation(batch_size=args.sample_num,
+                                                   local_dim=args.zl_dim,
+                                                   global_dim=args.zg_dim,
+                                                   periodic_dim=args.zp_dim,
+                                                   spatial_size=args.spatial_size),
+                                            volatile=False)
 
     # generate fake image
-    fake_img = generator(random_noise)
-
+    fake_img = generator(random_noise, tile=args.tile)
     save_image(fake_img.mul(0.5).add(0.5).cpu(), output_dir=args.save_dir, img_name="sample_from_random_noise")
+    fake_img = generator(random_noise_interpolation, tile=1)
+    save_image(fake_img.mul(0.5).add(0.5).cpu(), output_dir=args.save_dir, img_name="interpolation_sample")
+    fake_img = generator(random_noise_interpolation_left_right, tile=1)
+    save_image(fake_img.mul(0.5).add(0.5).cpu(), output_dir=args.save_dir, img_name="interpolation_left_to_right_sample")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -89,12 +106,12 @@ if __name__ == '__main__':
     parser.add_argument('--zg_dim', type=int, default=20, help='size of global part noise dimension')  # set default same as author's implementation
     parser.add_argument('--zp_dim', type=int, default=3, help='size of periodic part noise dimension') # set default same as author's implementation
     parser.add_argument('--mlp_hidden_dim', type=int, default=60, help='size of periodic part noise dimension')
-    parser.add_argument('--spatial_size', type=int, default=16, help='size of spatial dimension')
+    parser.add_argument('--spatial_size', type=int, default=64, help='size of spatial dimension')
     # for pytorch there is no pad="same", if you need use 5 or other sizes, you might need add torch.nn.functional.pad in the model.
     parser.add_argument('--kernel_size', type=int, default=4, help='size of kernels')
     parser.add_argument('--layer_num', type=int, default=5, help='number of layers')
-    parser.add_argument('--base_conv_channel', type=int, default=64, help='base channel number of convolution layer')
-    parser.add_argument('--tile', type=int, default=4, help='')
+    parser.add_argument('--base_conv_channel', type=int, default=32, help='base channel number of convolution layer')
+    parser.add_argument('--tile', type=int, default=1, help='')
 
     parser.add_argument('--save_dir', type=str, default="./log/sampled", help='directory of saving sampled image')
 

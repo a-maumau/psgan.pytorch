@@ -72,6 +72,10 @@ def train(args):
     if args.sgd:
         generator_optimizer = torch.optim.SGD(generator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
         discriminator_optimizer = torch.optim.SGD(discriminator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 28c593413de1a523bb3a4c4e5aad7e8220e977c0
     else:
         generator_optimizer = torch.optim.Adam(generator.parameters(), lr=args.learning_rate_d, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
         discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=args.learning_rate_d, weight_decay=1e-8, betas=(args.adam_beta, 0.999))
