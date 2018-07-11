@@ -14,11 +14,11 @@ same global noise.
   
 tiled.  
 ![same_global_noise.png](samples/sample_from_random_noise.png)  
-
+  
 interpolation.  
-4 corners
-![4corner_interpolation.png](samples/corner_interpolation_sample_resized.png)
-
-left to right.
-![left_to_right_interpolation.png](samples/left_to_right_interpolation_sample_resized.png)
+4 corners  
+![4corner_interpolation.png](samples/corner_interpolation_sample_resized.png)  
+  
+left to right.  
+![left_to_right_interpolation.png](samples/left_to_right_interpolation_sample_resized.png)  
   
