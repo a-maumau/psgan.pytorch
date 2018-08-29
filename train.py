@@ -28,11 +28,15 @@ def train(args):
         if torch.cuda.is_available() and not args.nogpu:
             x = x.cuda(args.gpu_device_num)
         return Variable(x, volatile=volatile, requires_grad=requires_grad)
-    
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
 
-    print("\nsaving at {}\n".format(args.save_dir))
+    # for loggin the trainning
+    tlog = TrainLogger(log_dir=save_dir, log_name=args.save_name, namespaces={"train":["epoch", "total_loss", "discriminator_loss", "generator_loss"]}, arguments=args._get_kwargs(), notificate=False, suppress_err=False)
+    tlog.start_http_server(bind_port=8080)
+    tlog.start_msg_server(bind_port=8082)
+
+    save_dir = tlog.log_save_path
+
+    print("\nsaving at {}\n".format(save_dir))
     print("initializing...")
 
     # if args.layer_num is 5 and args.base_conv_channel is 64 then
@@ -66,8 +70,6 @@ def train(args):
         for idx, m in enumerate(model.modules()):
             print(idx, '->', m)
 
-        print(args)
-
     # training setting
     if args.sgd:
         generator_optimizer = torch.optim.SGD(generator.parameters(), lr=args.learning_rate_g, momentum=0.9, weight_decay=1e-8)
@@ -83,11 +85,6 @@ def train(args):
                               batch_size=args.batch_size,
                               shuffle=True,
                               num_workers=args.num_workers)
-
-    # for loggin the trainning
-    tlog = TrainLogger("train_log", log_dir=args.save_dir, csv=True, header=True, suppress_err=False)
-    tlog.disable_pickle_object()
-    tlog.set_default_Keys(["epoch", "total_loss", "discriminator_loss", "generator_loss"])
 
     # output from discriminator is [0,1] of each patch, exsisting spatial_size*spatial_size number.
     true_label = torch.ones(args.batch_size, args.spatial_size*args.spatial_size)
@@ -172,20 +169,27 @@ def train(args):
             generator_optimizer.step()
             
             _train_loader.set_description("train[{}] dloss: {:.5f}, gloss: {:.5f}"
-                         .format(args.save_dir, epoch_total_dloss, epoch_total_gloss))
+                         .format(save_dir, epoch_total_dloss, epoch_total_gloss))
 
         if (epoch+1) % args.save_sample_every == 0:
             generator.eval()
             # generate fake image
             fake_img = generator(fixed_noise)
 
-            save_image(fake_img.mul(0.5).add(0.5).cpu(), output_dir=args.save_dir, img_name="sample_e{}".format(epoch+1))
+            tlog.setup_output("epoch {} sample".format(epoch+1))
+            for i in range(fake_img.shape[0]:)
+                sampled_img = Image.fromarray(np.uint8(fake_img[0].mul(0.5).add(0.5).cpu().numpy().transpose(1,2,0)))
+                tlog.pack(sampled_img)
+            tlog.pack_output(None, "sampled in all word")
+            tlog.flush_output()
+
+            #save_image(fake_img.mul(0.5).add(0.5).cpu(), output_dir=save_dir, img_name="sample_e{}".format(epoch+1))
             generator.train()
 
         tqdm.write("[#{}]train epoch dloss: {:.5f}, gloss: {:.5f}"
             .format(epoch+1, epoch_total_dloss, epoch_total_gloss))
 
-        tlog.log([epoch+1, float(epoch_total_loss), float(epoch_total_dloss), float(epoch_total_gloss)])
+        tlog.log("train", [epoch+1, float(epoch_total_loss), float(epoch_total_dloss), float(epoch_total_gloss)])
 
         # save model
         if (epoch+1) % args.save_model_every == 0:
@@ -193,18 +197,18 @@ def train(args):
                      'optimizer_state_dict' : generator_optimizer.state_dict()}
             discriminator_state = {'epoch': epoch + 1,
                      'optimizer_state_dict' : discriminator_optimizer.state_dict()}
-            generator.save(add_state=generator_state, file_name=os.path.join(args.save_dir,'generator_param_epoch{}.pth'.format(epoch+1)))
-            discriminator.save(add_state=discriminator_state, file_name=os.path.join(args.save_dir,'discriminator_param_epoch{}.pth'.format(epoch+1)))
+            generator.save(add_state=generator_state, file_name=os.path.join(save_dir,'generator_param_epoch{}.pth'.format(epoch+1)))
+            discriminator.save(add_state=discriminator_state, file_name=os.path.join(save_dir,'discriminator_param_epoch{}.pth'.format(epoch+1)))
 
             tqdm.write("model saved.")
 
     # saving training result
     generator.save(add_state={'optimizer_state_dict' : generator_optimizer.state_dict()},
-               file_name=os.path.join(args.save_dir,'generator_param_fin_{}.pth'.format(epoch+1, datetime.now().strftime("%Y%m%d_%H-%M-%S"))))
+               file_name=os.path.join(save_dir,'generator_param_fin_{}.pth'.format(epoch+1, datetime.now().strftime("%Y%m%d_%H-%M-%S"))))
     discriminator.save(add_state={'optimizer_state_dict' : discriminator_optimizer.state_dict()},
-               file_name=os.path.join(args.save_dir,'discriminator_param_fin_{}.pth'.format(epoch+1, datetime.now().strftime("%Y%m%d_%H-%M-%S"))))
+               file_name=os.path.join(save_dir,'discriminator_param_fin_{}.pth'.format(epoch+1, datetime.now().strftime("%Y%m%d_%H-%M-%S"))))
 
-    print("data is saved at {}".format(args.save_dir))
+    print("data is saved at {}".format(save_dir))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -230,6 +234,7 @@ if __name__ == '__main__':
     #parser.add_argument('--resize_size', type=int, default=80, help='size for image after processing')
 
     parser.add_argument('--save_dir', type=str, default="./log/", help='dir of saving log and model parameters and so on')
+    parser.add_argument('--save_name', type=str, default="pspgan_train", help='name of this traning')    
     parser.add_argument('--save_sample_every', type=int, default=100, help='count of saving model')
     parser.add_argument('--save_model_every', type=int, default=500, help='count of saving model')
 
@@ -240,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning_rate_g', type=float, default=2e-4, help="initial value of learning rate")
     parser.add_argument('--learning_rate_d', type=float, default=5e-5, help="initial value of learning rate")
     parser.add_argument('--adam_beta', type=float, default=0.5, help="initial value of learning rate")
-    parser.add_argument('--decay_value', type=float, default=0.1, help="decay learning rate with count of args:decay_every in this factor.")
+    parser.add_argument('--decay_value', type=float, default=0.1, help="decay learning rate with count of args:decay_every in this factor")
     parser.add_argument('--decay_every', type=int, default=2000, help="count of decaying learning rate")
 
     parser.add_argument('--gpu_device_num', type=int, default=0, help="device number of gpu")
